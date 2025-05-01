@@ -36,6 +36,7 @@ class FilingsFetcher:
             print(f"Failed to fetch ticker-CIK mapping: {e}")
 
     def _get_metadata(self, cik: str, company: str) -> Dict[str, Any] | None:
+        """Get the metadata by cik."""
         try:
             url = SUBMISSIONS_URL.format(cik)
             print(f"\nFetching metadata for {company} (CIK: {cik}) from {url}...")
@@ -47,6 +48,7 @@ class FilingsFetcher:
             print(f"Failed to get metadata: {e}")
 
     def _get_accession_numbers(self, metadata: Dict[str, Any], years: List[str]) -> List[Tuple[str, str]]:
+        """Extracts the relevant accession numbers from the retrieved metadata."""
         metadata_recent = metadata['filings']['recent']
         filings = zip(
             metadata_recent['accessionNumber'],
@@ -57,14 +59,15 @@ class FilingsFetcher:
         return [(accNumber, accNumber.replace("-", "")) for accNumber, form, reportDate in filings if match_expression(form, reportDate)][:NUM_OLDEST_FILINGS]
 
     def _get_file_index(self, index_url: str, accession_dashed: str, index_file_path: str) -> List[Dict]:
+        """Creates a index.csv file and returns the filing file information in dict format."""
         try:
             response = requests.get(index_url, headers=HEADERS)
             response.raise_for_status()
             file_index = []
         
             with open(index_file_path, 'w', encoding='utf-8') as f:
-                f.write("File Name,File URL\n")
-                f.write(f"Index URL: {index_url}")
+                f.write("\"File Name\",\"File URL\"\n")
+                f.write(f"\"Index URL\",\"{index_url}\"\n")
                 for link in BeautifulSoup(response.content, features="html.parser").find_all('a', href=True):
                     relative_url = link['href']
                     file_name = relative_url.split('/')[-1]
@@ -76,7 +79,7 @@ class FilingsFetcher:
                         continue
                     
                     full_url = f"https://www.sec.gov{relative_url}"
-                    f.write(f"{file_name},{full_url}\n")
+                    f.write(f"\"{file_name}\",\"{full_url}\"\n")
                     file_index.append({
                         "file_name" : file_name,
                         "full_url": full_url
@@ -87,6 +90,7 @@ class FilingsFetcher:
             print(f"Failed to download index page: {e}")
 
     def _get_file(self, url: str, file_path: str) -> bool:
+        """Downloads a certain file identified by a url."""
         try:
             with requests.get(url, headers=HEADERS, stream=True) as response:
                 response.raise_for_status()
@@ -98,9 +102,9 @@ class FilingsFetcher:
             print(f"Failed to download {url}: {e}")
             return False
 
-    def get_filings(self, cik: str, ticker: str, years: List[str]) -> None:
-        # Fetch and process filings
-        company = ticker or "Unknown Company"
+    def get_filings(self, cik: str, ticker: str | None, years: List[str]) -> None:
+        """Handles the filing extraction/download process."""
+        company = ticker or "Unknown_Company"
         cik_stripped = cik.lstrip("0")
         metadata = self._get_metadata(cik, company)
         accession_numbers = self._get_accession_numbers(metadata, years)
@@ -109,7 +113,7 @@ class FilingsFetcher:
             filing_url = f"{BASE_URL}/{cik_stripped}/{accession_clean}"
             index_url = f"{filing_url}/{accession_dashed}-index.htm"
             company_filing_dir = f"{self.filings_directory}/{company}/{accession_dashed}"
-            index_file_path = f"{company_filing_dir}/index.txt"
+            index_file_path = f"{company_filing_dir}/index.csv"
 
             print(f"Processing filing: {index_url}, Company: {company}")
             
