@@ -105,7 +105,7 @@ class FilingsExtractor:
             tables = {}
             for i, table in enumerate(soup.find_all("table")):
                 try:
-                    df = pd.read_html(StringIO(table))[0]
+                    df = pd.read_html(StringIO(str(table)))[0]
                     df = df.dropna(how="all").reset_index(drop=True)
                     
                     if any("$" in str(x) for x in df.iloc[0]):
