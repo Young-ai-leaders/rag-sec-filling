@@ -6,3 +6,5 @@ FETCHER_SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{}.json"
 FETCHER_HEADERS = {'User-Agent': 'Young AI Leaders Linz office@youngaileaderslinz.at'}
 DEFAULT_FETCHER_SUPPORTED_FILE_TYPES = ('.htm', '.txt', '.xml', '.xsd')
 DEFAULT_FETCHER_IGNORED_KEYWORDS = ('companysearch', '-index.htm')
+
+DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY = './output'

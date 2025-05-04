@@ -51,13 +51,13 @@ class FilingsFetcher:
 
     def _get_accession_numbers(self, metadata: Dict[str, Any], years: List[str]) -> List[Tuple[str, str]]:
         """Extracts the relevant accession numbers from the retrieved metadata."""
-        metadata_recent = metadata['filings']['recent']
+        metadata_recent = metadata["filings"]["recent"]
         filings = zip(
-            metadata_recent['accessionNumber'],
-            metadata_recent['form'],
-            metadata_recent['reportDate']
+            metadata_recent["accessionNumber"],
+            metadata_recent["form"],
+            metadata_recent["reportDate"]
         )
-        match_expression = lambda form, reportDate: form == '10-K' and (years is None or reportDate[:4] in years)
+        match_expression = lambda form, reportDate: form == "10-K" and (years is None or reportDate[:4] in years)
         return [(accNumber, accNumber.replace("-", "")) for accNumber, form, reportDate in filings if match_expression(form, reportDate)][:NUM_OLDEST_FILINGS]
 
     def _get_file_index(self, index_url: str, accession_dashed: str, index_file_path: str) -> List[Dict]:
@@ -67,12 +67,12 @@ class FilingsFetcher:
             response.raise_for_status()
             file_index = []
         
-            with open(index_file_path, 'w', encoding='utf-8') as f:
+            with open(index_file_path, "w", encoding="utf-8") as f:
                 f.write("\"File Name\",\"File URL\"\n")
                 f.write(f"\"Index URL\",\"{index_url}\"\n")
-                for link in BeautifulSoup(response.content, features="html.parser").find_all('a', href=True):
-                    relative_url = link['href']
-                    file_name = relative_url.split('/')[-1]
+                for link in BeautifulSoup(response.content, features="html.parser").find_all("a", href=True):
+                    relative_url = link["href"]
+                    file_name = relative_url.split("/")[-1]
                     
                     # Skip unwanted files
                     if (not relative_url.lower().endswith(self.supported_file_types) or
@@ -96,7 +96,7 @@ class FilingsFetcher:
         try:
             with requests.get(url, headers=FETCHER_HEADERS, stream=True) as response:
                 response.raise_for_status()
-                with open(file_path, 'wb') as file:
+                with open(file_path, "wb") as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         file.write(chunk)
             return True
@@ -132,4 +132,4 @@ if __name__ == "__main__":
     ticker = "AAPL"
     filings_fetcher = FilingsFetcher()
     cik = filings_fetcher.get_cik_from_ticker(ticker)
-    filings_fetcher.get_filings(cik, ticker, ['2024'])
+    filings_fetcher.get_filings(cik, ticker, ["2024"])
