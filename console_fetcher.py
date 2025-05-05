@@ -1,4 +1,5 @@
 from filing_fetcher import FilingsFetcher
+from console_parser import run_parser_console
 from typing import List, Tuple
 
 def get_valid_company_input(filings_fetcher: FilingsFetcher) -> Tuple[str | None, str]:
@@ -27,4 +28,5 @@ filings_fetcher = FilingsFetcher()
 ticker, cik = get_valid_company_input(filings_fetcher)
 years = get_years()
 filings_fetcher.get_filings(cik, ticker, years)
+run_parser_console(ticker)
 print(f"\nAll filings for {ticker or cik} have been downloaded.")
