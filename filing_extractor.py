@@ -20,29 +20,30 @@ class FilingsExtractor:
         
         return [filing for filing in os.listdir(company_dir) if os.path.isdir(f"{company_dir}/{filing}")]
 
-    def extract_tables(self, ticker: str, filing: str) -> Dict[str, Any]:
-        print(f"Extracting {ticker}'s filing: {latest_filing}")
-        filing_dir = f"{self.filings_directory}/{ticker}/{filing}"
+    def extract_tables(self, ticker: str, filing_name: str) -> Dict[str, Any]:
+        print(f"Extracting {ticker}'s filing: {filing_name}")
+        filing_dir = f"{self.filings_directory}/{ticker}/{filing_name}"
         
         for file in os.listdir(filing_dir):
             if file.endswith("_htm.xml"):
-                xbrl_data = self._parse_xbrl(f"{filing_dir}/{file}")
+                xbrl_data = self._parse_xbrl(filing_name, f"{filing_dir}/{file}")
                 if not xbrl_data:
                     continue
 
                 xbrl_data["source"] = "xbrl"
                 return xbrl_data
         
-        for file in os.listdir(filing_dir):
-            if file.endswith(".htm") and not file.endswith("-index.htm"):
-                html_data = self._parse_html(f"{filing_dir}/{file}")
-                if not html_data:
-                    continue
+        # TODO fix html parser
+        # for file in os.listdir(filing_dir):
+        #     if file.endswith(".htm") and not file.endswith("-index.htm"):
+        #         html_data = self._parse_html(f"{filing_dir}/{file}")
+        #         if not html_data:
+        #             continue
 
-                html_data["source"] = "html"
-                return html_data
+        #         html_data["source"] = "html"
+        #         return html_data
         
-    def _parse_xbrl(self, file_path: str) -> Dict[str, Any]:
+    def _parse_xbrl(self, filing_name:str, file_path: str) -> Dict[str, Any]:
         try:
             tree = etree.parse(file_path)
             root = tree.getroot()
@@ -93,7 +94,7 @@ class FilingsExtractor:
                     "contry": context["country"]
                 })
 
-            return {"financial_data": pd.DataFrame(facts)}
+            return {filing_name: pd.DataFrame(facts)}
         except Exception as e:
             print(f"XBRL Error: {e}")
 
@@ -120,10 +121,12 @@ class FilingsExtractor:
         except Exception as e:
             print(f"HTML Error: {e}")
 
-    def save_to_csv(self, data: List, output_dir: str = DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY) -> None:
+    def save_to_csv(self, data: List, ticker: str, output_dir: str = DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY) -> None:
         if not data:
             print("No data to save.")
             return
+        
+        output_dir = os.path.join(output_dir, ticker)
         
         os.makedirs(output_dir, exist_ok=True)
         for name, df in data.items():
@@ -138,8 +141,8 @@ if __name__ == "__main__":
     filings = extractor.get_company_filings(ticker)
     
     if filings:
-        latest_filing = filings[0]
-        extracted_data = extractor.extract_tables(ticker, latest_filing)
-        extractor.save_to_csv(extracted_data)
+        for filing_name in filings:
+            extracted_data = extractor.extract_tables(ticker, filing_name)
+            extractor.save_to_csv(extracted_data, ticker)
     else:
         print(f"No filings found for {ticker}")
