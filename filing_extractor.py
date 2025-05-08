@@ -21,20 +21,20 @@ class FilingsExtractor:
         
         return [filing for filing in os.listdir(company_dir) if os.path.isdir(f"{company_dir}/{filing}")]
 
-    def extract_data(self, ticker: str, filings: List[str]) -> Dict[str, Any]:
+    def extract_data(self, ticker: str, filings: List[str]) -> Dict[str, pd.DataFrame]:
         """Extract the financial data from a list of filings."""
         result = {}
         for filing in filings:
             print(f"Extracting {ticker}'s filing: {filing}")
-            parsing_result = self._parse_filing(filing)
+            parsing_result = self._parse_filing(ticker, filing)
             if parsing_result is not None:
                 result[filing] = parsing_result
         
         return result
         
-    def _parse_filing(self, filing_name: str) -> pd.DataFrame | None:
+    def _parse_filing(self, ticker: str, filing: str) -> pd.DataFrame | None:
         """Handles the parsing of one specific filing."""
-        filing_dir = f"{self.filings_directory}/{ticker}/{filing_name}"
+        filing_dir = f"{self.filings_directory}/{ticker}/{filing}"
         
         for file in os.listdir(filing_dir):
             if file.endswith("_htm.xml"):
@@ -44,7 +44,7 @@ class FilingsExtractor:
                 return self._parse_html(f"{filing_dir}/{file}")
             
     def _parse_xbrl(self, file_path: str) -> pd.DataFrame | None:
-        """Handles the parsing of xbrl filing data files."""
+        """Handles the parsing of a filings xbrl data."""
         try:
             tree = etree.parse(file_path)
             root = tree.getroot()
@@ -140,7 +140,7 @@ class FilingsExtractor:
 
 if __name__ == "__main__":
     extractor = FilingsExtractor()
-    ticker = "AAPL"
-    filings = extractor.get_company_filings(ticker)
-    extracted_data = extractor.extract_data(ticker, filings)
-    extractor.save_to_csv(ticker, extracted_data)
+    c_ticker = "AAPL"
+    filings = extractor.get_company_filings(c_ticker)
+    extracted_data = extractor.extract_data(c_ticker, filings)
+    extractor.save_to_csv(c_ticker, extracted_data)
