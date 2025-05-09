@@ -3,21 +3,23 @@ import requests
 from bs4 import BeautifulSoup
 from typing import List, Tuple, Dict, Any
 
-NUM_OLDEST_FILINGS = 4
-HEADERS = {'User-Agent': 'Your Name your.email@example.com'}
-BASE_URL = "https://www.sec.gov/Archives/edgar/data"
-SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{}.json"
-TICKER_CIK_MAPPING_URL = "https://www.sec.gov/files/company_tickers.json"
+from settings import (
+    DEFAULT_FILINGS_DIRECTORY,
+    DEFAULT_FETCHER_SUPPORTED_FILE_TYPES,
+    DEFAULT_FETCHER_IGNORED_KEYWORDS,
+    FETCHER_HEADERS,
+    FETCHER_BASE_URL,
+    FETCHER_SUBMISSIONS_URL,
+    FETCHER_TICKER_CIK_MAPPING_URL,
+)
 
-DEFAULT_SUPPORTED_FILE_TYPES = ('.htm', '.txt', '.xml', '.xsd')
-DEFAULT_IGNORED_KEYWORDS = ('companysearch', '-index.htm')
-DEFAULT_FILINGS_DIRECTORY = './filings'
+NUM_OLDEST_FILINGS = 4
 
 class FilingsFetcher:
     def __init__(self, 
                  filings_directory: str = DEFAULT_FILINGS_DIRECTORY,
-                 supported_file_types: List[str] = DEFAULT_SUPPORTED_FILE_TYPES,
-                 ignored_keywords: List[str] = DEFAULT_IGNORED_KEYWORDS) -> None:
+                 supported_file_types: List[str] = DEFAULT_FETCHER_SUPPORTED_FILE_TYPES,
+                 ignored_keywords: List[str] = DEFAULT_FETCHER_IGNORED_KEYWORDS) -> None:
         self.filings_directory = filings_directory
         self.supported_file_types = supported_file_types
         self.ignored_keywords = ignored_keywords
@@ -25,7 +27,7 @@ class FilingsFetcher:
     def get_cik_from_ticker(self, ticker: str) -> str | None:
         """Get CIK number from stock ticker symbol."""
         try:
-            response = requests.get(TICKER_CIK_MAPPING_URL, headers=HEADERS)
+            response = requests.get(FETCHER_TICKER_CIK_MAPPING_URL, headers=FETCHER_HEADERS)
             response.raise_for_status()
             ticker_map = response.json() # The JSON is in format {index: {"cik_str": ..., "ticker": ..., "title": ...}}
             
@@ -38,10 +40,10 @@ class FilingsFetcher:
     def _get_metadata(self, cik: str, company: str) -> Dict[str, Any] | None:
         """Get the metadata by cik."""
         try:
-            url = SUBMISSIONS_URL.format(cik)
+            url = FETCHER_SUBMISSIONS_URL.format(cik)
             print(f"\nFetching metadata for {company} (CIK: {cik}) from {url}...")
     
-            response = requests.get(url, headers=HEADERS)
+            response = requests.get(url, headers=FETCHER_HEADERS)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -49,28 +51,28 @@ class FilingsFetcher:
 
     def _get_accession_numbers(self, metadata: Dict[str, Any], years: List[str]) -> List[Tuple[str, str]]:
         """Extracts the relevant accession numbers from the retrieved metadata."""
-        metadata_recent = metadata['filings']['recent']
+        metadata_recent = metadata["filings"]["recent"]
         filings = zip(
-            metadata_recent['accessionNumber'],
-            metadata_recent['form'],
-            metadata_recent['reportDate']
+            metadata_recent["accessionNumber"],
+            metadata_recent["form"],
+            metadata_recent["reportDate"]
         )
-        match_expression = lambda form, reportDate: form == '10-K' and (years is None or reportDate[:4] in years)
+        match_expression = lambda form, reportDate: form == "10-K" and (years is None or reportDate[:4] in years)
         return [(accNumber, accNumber.replace("-", "")) for accNumber, form, reportDate in filings if match_expression(form, reportDate)][:NUM_OLDEST_FILINGS]
 
     def _get_file_index(self, index_url: str, accession_dashed: str, index_file_path: str) -> List[Dict]:
         """Creates a index.csv file and returns the filing file information in dict format."""
         try:
-            response = requests.get(index_url, headers=HEADERS)
+            response = requests.get(index_url, headers=FETCHER_HEADERS)
             response.raise_for_status()
             file_index = []
         
-            with open(index_file_path, 'w', encoding='utf-8') as f:
+            with open(index_file_path, "w", encoding="utf-8") as f:
                 f.write("\"File Name\",\"File URL\"\n")
                 f.write(f"\"Index URL\",\"{index_url}\"\n")
-                for link in BeautifulSoup(response.content, features="html.parser").find_all('a', href=True):
-                    relative_url = link['href']
-                    file_name = relative_url.split('/')[-1]
+                for link in BeautifulSoup(response.content, features="html.parser").find_all("a", href=True):
+                    relative_url = link["href"]
+                    file_name = relative_url.split("/")[-1]
                     
                     # Skip unwanted files
                     if (not relative_url.lower().endswith(self.supported_file_types) or
@@ -92,9 +94,9 @@ class FilingsFetcher:
     def _get_file(self, url: str, file_path: str) -> bool:
         """Downloads a certain file identified by a url."""
         try:
-            with requests.get(url, headers=HEADERS, stream=True) as response:
+            with requests.get(url, headers=FETCHER_HEADERS, stream=True) as response:
                 response.raise_for_status()
-                with open(file_path, 'wb') as file:
+                with open(file_path, "wb") as file:
                     for chunk in response.iter_content(chunk_size=8192):
                         file.write(chunk)
             return True
@@ -110,7 +112,7 @@ class FilingsFetcher:
         accession_numbers = self._get_accession_numbers(metadata, years)
 
         for accession_dashed, accession_clean in accession_numbers:
-            filing_url = f"{BASE_URL}/{cik_stripped}/{accession_clean}"
+            filing_url = f"{FETCHER_BASE_URL}/{cik_stripped}/{accession_clean}"
             index_url = f"{filing_url}/{accession_dashed}-index.htm"
             company_filing_dir = f"{self.filings_directory}/{company}/{accession_dashed}"
             index_file_path = f"{company_filing_dir}/index.csv"
@@ -130,4 +132,4 @@ if __name__ == "__main__":
     ticker = "AAPL"
     filings_fetcher = FilingsFetcher()
     cik = filings_fetcher.get_cik_from_ticker(ticker)
-    filings_fetcher.get_filings(cik, ticker, ['2024'])
+    filings_fetcher.get_filings(cik, ticker, ["2024"])

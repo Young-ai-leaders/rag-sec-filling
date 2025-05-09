@@ -175,4 +175,4 @@ cython_debug/
 
 # ignore filing downloads
 filings/
-parsed_AAPL_structured.json
+output/
