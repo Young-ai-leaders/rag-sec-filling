@@ -6,8 +6,8 @@ load_dotenv()
 
 try:
     # Connect using environment variables
-    client = MongoClient(os.getenv("MONGODB_URI"))  # Must match .env variable name
-    db = client[os.getenv("DB_NAME")]  # "sec_filling" from .env
+    client = MongoClient(os.getenv("MONGODB_URI"))
+    db = client[os.getenv("DB_NAME")]
     collection = db[os.getenv("COLLECTION_NAME")]
 
     # Test connection
