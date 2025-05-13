@@ -1,0 +1,6 @@
+REMOVE THIS TEXT AND SAVE THIS AS .env AFTER ADDING YOUR CONNECTION STRING
+
+MONGODB_URI=your_connection_string_here
+DB_NAME=sec_filling
+COLLECTION_NAME=embedded_chunks
+SEARCH_INDEX_NAME="vector index"
