@@ -3,9 +3,19 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-client = MongoClient(os.getenv("MONGO_URI"))
 
-db = client["sec_filing"]
-collection = db["embedded_chunks"]
+try:
+    # Connect using environment variables
+    client = MongoClient(os.getenv("MONGODB_URI"))  # Must match .env variable name
+    db = client[os.getenv("DB_NAME")]  # "sec_filling" from .env
+    collection = db[os.getenv("COLLECTION_NAME")]
 
-print("Document count:", collection.count_documents({}))
+    # Test connection
+    print("Connection successful! Server info:")
+    print(client.server_info())
+
+    # Document count verification
+    print("\nDocument count:", collection.count_documents({}))
+
+except Exception as e:
+    print(f"Connection failed: {e}")
