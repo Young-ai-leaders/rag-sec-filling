@@ -21,6 +21,5 @@ def embed_filing(filing: Filing, model, tokenizer):
         chunk_embeddings = model_output[0][:, 0]
     # normalize embeddings
     chunk_embeddings = torch.nn.functional.normalize(chunk_embeddings, p=2, dim=1)
-    print("Chunk embeddings:", chunk_embeddings.shape)
     return chunk_embeddings
 
