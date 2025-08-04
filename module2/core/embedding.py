@@ -55,8 +55,10 @@ def calculate_embeddings_from_chunks(model, tokenizer, chunks: list[str]):
 
 def calculate_and_insert_embeddings(filing: Filing, model, tokenizer, chunks: list[str]):
     embeddings = calculate_embeddings_from_chunks(model, tokenizer, chunks)
-    inserted_ids = insert_filing_with_embeddings(filing, chunks, embeddings)
-    return inserted_ids
+    result = insert_filing_with_embeddings(filing, chunks, embeddings)
+    print(f"Inserted IDs: {result.upserted_ids}")
+    print(f"Skipped dupllicates: {result.matched_count}")
+    print(f"Failed Inserts: {len(result.bulk_api_result.get('writeErrors', []))}")
 
 if __name__ == "__main__":
     # Example usage
@@ -73,6 +75,4 @@ if __name__ == "__main__":
     model = AutoModel.from_pretrained('BAAI/bge-small-en')
 
 
-    result = calculate_and_insert_embeddings(filing, model, tokenizer, chunks)
-    print(f"Inserted IDs: {result.upserted_ids}")
-    print(f"Skipped dupllicates: {result.matched_count}")
+    calculate_and_insert_embeddings(filing, model, tokenizer, chunks)
