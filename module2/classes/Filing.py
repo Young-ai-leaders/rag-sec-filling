@@ -1,14 +1,14 @@
 
 class Filing:
-    def __init__(self, cik, ticker, filing_type, year, text_chunks, source, embeddings=None):
+    def __init__(self, cik, ticker, filing_type, year, source,text_chunk = None, embedding=None):
 
         self.cik = cik
         self.ticker = ticker
         self.filing_type = filing_type
         self.year = year
-        self.text_chunks = text_chunks
+        self.text_chunk = text_chunk
         self.source = source
-        self.embeddings = embeddings
+        self.embedding = embedding
 
 
     def __repr__(self):
@@ -21,8 +21,8 @@ class Filing:
             "ticker": self.ticker,
             "filing_type": self.filing_type,
             "year": self.year,
-            "text_chunks": self.text_chunks,
+            "text_chunk": self.text_chunk,
             "source": self.source,
-            "embeddings": self.embeddings
+            "embedding": self.embedding
         }
 
