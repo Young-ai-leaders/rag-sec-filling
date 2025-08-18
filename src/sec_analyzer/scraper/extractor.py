@@ -1,3 +1,4 @@
+# src/module1_scraper/extractor.py
 import re
 import pandas as pd
 from pathlib import Path
@@ -6,11 +7,11 @@ from io import StringIO
 from lxml import etree # type: ignore # lxml might not have stubs by default
 from typing import Dict, List, Optional
 
-from config.settings import (
+from sec_analyzer.config import (
     DEFAULT_FILINGS_DIRECTORY,
     DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY
 )
-from utils.helpers import sanitize_filename # Added import
+from sec_analyzer.utils import sanitize_filename
 
 
 class FilingsExtractor:

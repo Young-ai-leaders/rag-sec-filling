@@ -1,140 +1,138 @@
-# SEC Filing Analysis Engine (RAG Pipeline Initiative) - WIP
+# SEC Filing Analysis Engine (RAG Pipeline)
 
-This project is a community initiative to build a RAG (Retrieval Augmented Generation) pipeline for querying and analyzing company data from SEC filings. The project is structured into four distinct modules:
-
-1.  **Module 1: Web Scraper & Data Extractor (✅ Completed - Refinements Pending)**
-2.  **Module 2: Vector Database Integration (⏳ Upcoming)**
-3.  **Module 3: RAG Pipeline Implementation (⏳ Upcoming)**
-4.  **Module 4: Evaluation Framework (⏳ Upcoming)**
-
-**Current Status: Module 1 is functionally complete, allowing users to fetch, parse, and extract data from SEC 10-K filings. Further refinements and robust error handling for this module are planned.**
+This project is a community initiative to build a RAG (Retrieval Augmented Generation) pipeline for querying and analyzing company data from SEC filings. The system allows users to ask natural language questions about companies and receive accurate, context-aware answers sourced directly from their financial disclosures.
 
 ## Project Goal
 
-The ultimate goal is to create a system where users can ask natural language questions about companies (e.g., "What were Apple's revenues in 2023?", "Summarize Microsoft's main risk factors.") and receive accurate, context-aware answers sourced directly from their SEC filings.
+The ultimate goal is to create a system where a user can ask a question like, "What were Apple's main risk factors in 2023?" or "Compare Microsoft's and Google's R&D spending over the last three years," and receive a precise, data-backed answer.
 
-## Module 1: Web Scraper & Data Extractor
+## Current Status
 
-This initial module provides the foundational capabilities to acquire and preprocess data from the SEC EDGAR database.
+The foundational data pipeline is complete. The system can now fetch SEC filings, process them into structured data, load them into a vector database, and perform semantic searches.
 
-### Features
+*   **Module 1: Web Scraper & Data Extractor (✅ Completed)**
+*   **Module 2: Vector Database Integration (✅ Completed)**
+*   **Module 3: RAG Pipeline Implementation (⏳ Upcoming)**
+*   **Module 4: Evaluation Framework (⏳ Upcoming)**
 
-*   **Fetch Filings:**
-    *   Download 10-K filings for a specified company using its ticker symbol or CIK (Central Index Key).
-    *   Filter filings by specific years.
-    *   Specify the number of recent filings to retrieve.
-    *   Saves downloaded files (HTML, TXT, XBRL components) locally in an organized directory structure.
-*   **Parse Filings:**
-    *   Extracts the textual content of "Item 8. Financial Statements and Supplementary Data" from downloaded 10-K filings (both `.txt` and iXBRL `.htm` versions).
-    *   Splits the extracted Item 8 text into subsections (e.g., Consolidated Statements of Operations, Balance Sheets, Cash Flows, Notes).
-    *   Saves the parsed textual data as a structured JSON file, ideal for later use in a RAG pipeline (chunking and embedding).
-*   **Extract Data:**
-    *   Extracts structured financial data directly from XBRL components of the filings.
-    *   Prioritizes XBRL instance documents (e.g., `*_htm.xml` or iXBRL within the main `.htm` document).
-    *   Saves the extracted structured data (XBRL facts including concept names, values, units, and periods) into CSV files, one per filing.
+## Features
 
-### Tech Stack (Module 1)
+### Module 1: Data Acquisition & Extraction
+*   **Fetch Filings:** Download 10-K filings for any company using its ticker symbol or CIK.
+*   **Filter by Year:** Specify particular years or the number of recent filings to retrieve.
+*   **Extract Structured Data:** Automatically parse XBRL data from filings into clean, structured CSV files containing financial facts.
+*   **Parse Textual Data:** Extract the complete text from "Item 8: Financial Statements" and save it in a structured JSON format, ready for NLP tasks.
 
-*   Python 3.8+
-*   [Click](https://click.palletsprojects.com/): For the command-line interface.
-*   [Requests](https://requests.readthedocs.io/): For making HTTP requests to SEC EDGAR.
-*   [Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/bs4/doc/): For parsing HTML content (used in the text parser and for the index page of filings).
-*   [lxml](https://lxml.de/): For parsing XBRL (XML) data.
-*   [Pandas](https://pandas.pydata.org/): For handling and saving structured data (CSVs).
+### Module 2: Vector Database & Search
+*   **Ingest Data:** Process and chunk structured CSV data into a format suitable for semantic search.
+*   **Generate Embeddings:** Use state-of-the-art Hugging Face models to convert financial data into high-dimensional vector embeddings.
+*   **Vector Storage:** Upsert the data and its embeddings into a MongoDB Atlas collection.
+*   **Semantic Search:** Perform powerful vector similarity searches to find the most relevant financial facts based on natural language questions.
+*   **Metadata Filtering:** Filter search results by `ticker` and `year` to narrow down queries with high precision.
 
-### File Structure (Module 1 Output)
+## Tech Stack
+*   **Python 3.8+**
+*   **Command-Line Interface:** [Click](https://click.palletsprojects.com/)
+*   **Web Scraping:** [Requests](https://requests.readthedocs.io/), [Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/bs4/doc/)
+*   **Data Parsing:** [lxml](https://lxml.de/), [Pandas](https://pandas.pydata.org/)
+*   **Vector Database:** [MongoDB Atlas Vector Search](https://www.mongodb.com/products/platform/atlas-vector-search)
+*   **Embedding Models:** [Hugging Face Transformers](https://huggingface.co/docs/transformers/index) (`BAAI/bge-small-en`)
+*   **Database Driver:** [PyMongo](https://pymongo.readthedocs.io/)
 
-*   **Fetched Filings:** `filings/<TICKER>/<ACCESSION_NUMBER>/<files...>`
-*   **Parsed Textual Data:** `output/parsed_<TICKER>.json`
-*   **Extracted Structured Data:** `output/<TICKER>/<ACCESSION_NUMBER>.csv`
+## Setup & Installation
 
-### Setup & Installation (Module 1)
-
-1.  **Clone the repository (if applicable):**
-
+1.  **Clone the repository:**
+    ```bash
     git clone <your-repo-url>
-    cd <your-repo-name>
+    cd rag-sec-filling
+    ```
 
-2.  **Create and activate a virtual environment (recommended):**
-
-    python -m venv .venv
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python -m venv venv
     # On Windows:
-    # .venv\Scripts\activate
+    # venv\Scripts\activate
     # On macOS/Linux:
-    # source .venv/bin/activate
+    # source venv/bin/activate
+    ```
 
 3.  **Install dependencies:**
+    ```bash
+    pip install click requests beautifulsoup4 pandas lxml transformers torch pymongo python-dotenv
+    ```
+    *(Note: For GPU support with PyTorch, follow the official installation instructions.)*
 
-    pip install click requests beautifulsoup4 pandas lxml
-    # Or, if a requirements.txt is provided:
-    # pip install -r requirements.txt
+4.  **Configure Environment Variables:**
+    Create a file named `.env` in the project's root directory and add your credentials.
+    ```ini
+    # .env
+    MONGODB_URI="your_mongodb_atlas_connection_string"
+    DB_NAME="sec_filling"
+    COLLECTION_NAME="embedded_chunks"
+    SEARCH_INDEX_NAME="vector_index"
+    MODEL_NAME="BAAI/bge-small-en"
+    ```
 
-4.  **Configure User-Agent:**
-    *   Open `config/settings.py`.
-    *   Update the `FETCHER_HEADERS` dictionary with a valid `User-Agent` string. The SEC requires this for API access.
+5.  **Set SEC User-Agent:**
+    The SEC requires a custom User-Agent for all requests. Open `src/sec_analyzer/config.py` and update the `FETCHER_HEADERS` with your information:
+    ```python
+    FETCHER_HEADERS = {
+        "User-Agent": "YourCompanyName YourName your.email@example.com",
+        # ...
+    }
+    ```
 
-        FETCHER_HEADERS = {
-            "User-Agent": "YourProjectName YourName youremail@example.com", # <-- IMPORTANT: UPDATE THIS
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive"
-        }
+6.  **Set up MongoDB Atlas:**
+    *   Ensure you have a MongoDB Atlas cluster running.
+    *   After you run the `ingest` command for the first time, you must manually create the Vector Search Index on the collection. See the project documentation for the required JSON configuration.
 
-### Usage (Module 1 CLI)
+## Usage (Command-Line Interface)
 
-The main entry point is `cli.py`.
+The entire pipeline is controlled through `cli.py`.
 
-**1. Fetch Filings:**
+### Example Workflow: Analyzing Apple's 2023 10-K
 
-    python cli.py fetch --ticker <TICKER_SYMBOL> --years <YEARS> --num-filings <NUMBER>
-    # OR
-    python cli.py fetch --cik <CIK_NUMBER> --years <YEARS> --num-filings <NUMBER>
+**Step 1: Fetch the filing**
+```bash
+python cli.py fetch --ticker AAPL --years 2023 --num-filings 1
+```
 
-*   `--ticker`: Company stock ticker (e.g., AAPL).
-*   `--cik`: Company CIK (10-digit, will be zero-padded).
-*   `--years`: Comma-separated years (e.g., `2022,2023`). Optional.
-*   `--num-filings`: Number of recent 10-K filings to fetch. Defaults to 4.
+**Step 2: Extract structured XBRL data into a CSV**
+```bash
+python cli.py extract --ticker AAPL
+```
+*This will create a file at `output/AAPL/0000320193-23-000106.csv`.*
 
-**Example:**
+**Step 3: Ingest the CSV into the vector database**
+```bash
+python cli.py ingest --csv output/AAPL/0000320193-23-000106.csv --ticker AAPL --cik 0000320193 --year 2023
+```
 
-    python cli.py fetch --ticker AAPL --years 2023 --num-filings 1
+This will populate your MongoDB Atlas collection.
 
-**2. Parse Filings (Textual Item 8):**
+**Step 4: Create the Vector Search Index in the Atlas UI**  
+Follow the project documentation to create the `vector_index` on the `sec_filling.embedded_chunks` collection using the correct JSON definition.
 
-(Run after fetching filings for the ticker)
+**Step 5: Query your data!**
+```bash
+python cli.py query --q "What was the value for Accounts Receivable?" --ticker AAPL
+```
 
-    python cli.py parse <TICKER_SYMBOL>
+**Expected Output:**
+```
+Found 5 result(s):
 
-*   `<TICKER_SYMBOL>`: The ticker for which filings were downloaded.
+ score=0.9327 | AAPL (2023)
+For a financial record, the metric is 'AccountsPayableCurrent', its value is 62611000000.0, with unit 'usd'.
+------------------------------------------------------------
 
-**Example:**
+ score=0.9312 | AAPL (2023)
+For a financial record, the metric is 'AccountsReceivableNetCurrent', its value is 28184000000.0, with unit 'usd'.
+------------------------------------------------------------
+...
+```
 
-    python cli.py parse AAPL
+## Future Work
 
-Output: `output/parsed_AAPL.json`
-
-**3. Extract Data (Structured XBRL to CSV):**
-
-(Run after fetching filings for the ticker)
-
-    python cli.py extract <TICKER_SYMBOL>
-
-*   `<TICKER_SYMBOL>`: The ticker for which filings were downloaded.
-
-**Example:**
-
-    python cli.py extract AAPL
-
-Output: `output/AAPL/<ACCESSION_NUMBER>.csv`
-
-### Planned Refinements for Module 1
-
-*   More robust filtering of non-filing links during the `fetch` process.
-*   Enhanced error handling and logging across all components.
-*   Improved heuristics for HTML table extraction in the `FilingsExtractor` if XBRL is not available or for older filings.
-*   Further cleaning of text extracted by the `FilingParser` (e.g., removing page numbers, excessive whitespace).
-*   Comprehensive unit and integration tests.
-
-## Contributing
-
-This is a community initiative! Details on how to contribute to upcoming modules will be provided soon. For Module 1, feedback and bug reports are welcome.
-
+* **Module 3 (RAG Pipeline):** Integrate a Large Language Model (LLM) to take the search results and generate a human-readable, conversational answer.
+* **Module 4 (Evaluation):** Build a framework to evaluate the accuracy and relevance of the answers generated by the RAG pipeline.

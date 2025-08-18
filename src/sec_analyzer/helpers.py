@@ -1,4 +1,4 @@
-# utils/helpers.py
+# src/sec_analyzer/utils.py
 import os
 import re
 import time

@@ -1,6 +1,0 @@
-REMOVE THIS TEXT AND SAVE THIS AS .env AFTER ADDING YOUR CONNECTION STRING
-
-MONGODB_URI=mongodb+srv://ahsan:<db_password>@cluster0.gsfa0py.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
-DB_NAME=sec_filling
-COLLECTION_NAME=embedded_chunks
-SEARCH_INDEX_NAME=vector index
