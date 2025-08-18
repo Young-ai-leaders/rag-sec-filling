@@ -51,9 +51,9 @@ The foundational data pipeline is complete. The system can now fetch SEC filings
     ```bash
     python -m venv venv
     # On Windows:
-    # venv\Scripts\activate
+    venv\Scripts\activate
     # On macOS/Linux:
-    # source venv/bin/activate
+    source venv/bin/activate
     ```
 
 3.  **Install dependencies:**
