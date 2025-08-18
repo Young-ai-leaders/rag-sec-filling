@@ -43,7 +43,7 @@ The foundational data pipeline is complete. The system can now fetch SEC filings
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repo-url>
+    git clone (https://github.com/Young-ai-leaders/rag-sec-filling.git)
     cd rag-sec-filling
     ```
 
