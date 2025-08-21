@@ -1,13 +1,13 @@
-# core/fetcher.py
+# src/module1_scraper/fetcher.py
 import os
 import re
-import requests  # Ensure this is imported
-import json  # For JSONDecodeError and a json.dumps for debugging
+import requests  
+import json  
 from bs4 import BeautifulSoup
 from typing import List, Tuple, Dict, Any, Optional
 from pathlib import Path  # Added Path here
 
-from config.settings import (
+from sec_analyzer.config import (
     DEFAULT_FILINGS_DIRECTORY,
     DEFAULT_FETCHER_SUPPORTED_FILE_TYPES,
     DEFAULT_FETCHER_IGNORED_KEYWORDS,
@@ -16,7 +16,7 @@ from config.settings import (
     FETCHER_SUBMISSIONS_URL,
     FETCHER_TICKER_CIK_MAPPING_URL,
 )
-from utils.helpers import sanitize_filename, create_directory
+from sec_analyzer.utils import sanitize_filename, create_directory
 
 
 class FilingsFetcher:

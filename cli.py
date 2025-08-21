@@ -1,171 +1,168 @@
 # cli.py
+import os
+import sys
 import click
 from pathlib import Path
-from typing import List, Optional
-from core.fetcher import FilingsFetcher
-from core.parser import FilingParser
-from core.extractor import FilingsExtractor
-from config.settings import (
-    DEFAULT_FILINGS_DIRECTORY,
-    DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY
+from dotenv import load_dotenv
+
+# Ensure the 'src' directory is on the Python path to find the 'sec_analyzer' package.
+sys.path.append(os.path.abspath("src"))
+load_dotenv()
+
+# --- Imports from our sec_analyzer package ---
+from sec_analyzer import FilingsFetcher, FilingsExtractor, FilingParser
+from sec_analyzer.config import DEFAULT_FILINGS_DIRECTORY, DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY
+from sec_analyzer.vector_db.model_loader import load_model_and_tokenizer
+from sec_analyzer.vector_db.chunking import (
+    process_csv_to_natural_language,
+    process_csv_to_raw_string,
+    process_csv_original_method,
 )
-from utils.helpers import validate_years, sanitize_filename
-import requests
+from sec_analyzer.schemas import Filing
+from sec_analyzer.vector_db.embedding import insert_filing_with_embeddings
+from sec_analyzer.vector_db.search_service import vector_search_with_filter
+from pymongo import MongoClient
 
 
-@click.group()
-@click.version_option(version="0.1", prog_name="SEC Scraper")
+@click.group(help="A command-line tool to fetch, process, and query SEC filings.")
 def cli():
-    """Command-line interface for SEC filings analysis"""
+    """Main entry point for the SEC Analyzer CLI."""
     pass
 
 
 @cli.command()
-@click.option("--ticker", help="Company ticker symbol (e.g. AAPL)", default=None, type=str)
-@click.option("--cik", help="SEC Central Index Key (10-digit number)", default=None, type=str)
-@click.option("--years", help="Comma-separated years filter (e.g. 2020,2021)", default=None, type=str)
-@click.option("--num-filings", default=4, help="Number of filings to fetch", type=int)
-def fetch(ticker: Optional[str], cik: Optional[str], years: Optional[str], num_filings: int):
-    """Fetch SEC filings for a company"""
+@click.option("--ticker", help="Company ticker symbol (e.g., AAPL)")
+@click.option("--cik", help="Company CIK number (e.g., 0000320193)")
+@click.option("--years", multiple=True, type=int, help="Years to fetch (e.g., --years 2023 --years 2022)")
+@click.option("--num-filings", default=4, type=int, show_default=True, help="Number of recent filings to get per year.")
+def fetch(ticker, cik, years, num_filings):
+    """Fetch SEC 10-K filings and save them locally."""
+    if not ticker and not cik:
+        raise click.UsageError("Error: Must provide either --ticker or --cik.")
+    
     fetcher = FilingsFetcher()
-
-    # Validate input and determine CIK
-    if not (ticker or cik):
-        raise click.BadParameter("Must provide either --ticker or --cik.")
-
-    actual_cik: str
-    company_identifier_for_log: str  # For logging, use ticker if available
-
-    if cik:
-        if not cik.isdigit() or not (1 <= len(cik) <= 10):
-            raise click.BadParameter("CIK must be 1-10 digits.")
-        actual_cik = cik.zfill(10)
-        company_identifier_for_log = ticker if ticker else f"CIK:{actual_cik}"
-    elif ticker:  # ticker is provided, cik is not
-        company_identifier_for_log = ticker
-        fetched_cik = fetcher.get_cik_from_ticker(ticker)
-        if not fetched_cik:
-            # get_cik_from_ticker already prints a message if not found
-            raise click.BadParameter(f"Could not find CIK for ticker '{ticker}'.")
-        actual_cik = fetched_cik  # Already 10 digits and zfilled
-    else:
-        # This case should be impossible due to the first check, but as a safeguard:
-        raise click.BadParameter("Internal error: CIK could not be determined.")
-
-    # Process years
-    year_list_int: Optional[List[int]] = None
-    if years:
-        raw_year_list = [y.strip() for y in years.split(",") if y.strip()]
-        if raw_year_list:  # Only call validate_years if there's something to validate
-            year_list_int = validate_years(raw_year_list)
-            if year_list_int is None:  # validate_years returns None on fundamental error
-                raise click.BadParameter(
-                    "Invalid format for years. Please use comma-separated digits (e.g., 2020,2021).")
-            if not year_list_int:  # validate_years might return empty list if input was non-digits
-                click.echo(
-                    f"Warning: No valid years found in filter: '{years}'. Fetching without year constraint based on this filter.")
-                year_list_int = None  # Treat as no year filter
-        else:  # E.g., --years "" or --years ","
-            click.echo("Warning: Years filter was empty. Fetching without year constraint based on this filter.")
-            year_list_int = None
-
-    click.echo(
-        f"📥 Fetching up to {num_filings} filings for '{company_identifier_for_log}' (Resolved CIK: {actual_cik})...")
-    if year_list_int:
-        click.echo(f"   Filtering for years: {year_list_int}")
-
-    try:
-        # Pass the determined actual_cik, original ticker (for logging/dir naming), and processed year_list_int
-        fetcher.get_filings(actual_cik, ticker, year_list_int, num_filings)
-        # Success message is now handled within fetcher.get_filings
-    except ValueError as e:  # For CIK validation errors from fetcher
-        raise click.BadParameter(str(e))
-    except requests.exceptions.RequestException as e:
-        click.echo(f"❌ A network error occurred during fetch: {e}", err=True)
-    except Exception as e:
-        click.echo(f"❌ An unexpected error occurred during fetch: {e}", err=True)
-        # For deeper debugging, you might want to re-raise or log traceback
-        # import traceback
-        # click.echo(traceback.format_exc(), err=True)
-
+    effective_cik = cik or fetcher.get_cik_from_ticker(ticker)
+    if not effective_cik:
+        click.echo(f"Could not determine CIK for ticker '{ticker}'. Aborting.", err=True)
+        return
+        
+    click.echo(f"Starting to fetch filings for {ticker or 'CIK:'} ({effective_cik})...")
+    fetcher.get_filings(cik=effective_cik, ticker=ticker, years=list(years), num_filings=num_filings)
+    click.echo("✅ Fetch complete.")
 
 @cli.command()
-@click.argument("ticker")
-@click.option("--output", default=None, help="Custom output JSON file path for parsed data")
-def parse(ticker: str, output: Optional[str]):
-    """Parse financial sections from downloaded filings for a ticker"""
-    parser = FilingParser()  # Initializes with DEFAULT_FILINGS_DIRECTORY
-    safe_ticker = sanitize_filename(ticker)
-
-    company_filings_path = Path(DEFAULT_FILINGS_DIRECTORY) / safe_ticker
-
-    output_path_obj: Path
-    if output:
-        output_path_obj = Path(output)
-    else:
-        output_dir = Path(DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY)
-        output_path_obj = output_dir / f"parsed_{safe_ticker}.json"
-
-    output_path_obj.parent.mkdir(parents=True, exist_ok=True)
-
-    if not company_filings_path.exists() or not company_filings_path.is_dir():
-        raise click.FileError(
-            f"No filings directory found for ticker '{ticker}' at '{company_filings_path}'. Please run the 'fetch' command first.")
-
-    click.echo(f"🔍 Parsing filings for '{ticker}' from '{company_filings_path}'...")
+@click.option("--ticker", required=True, help="Ticker symbol to process.")
+def extract(ticker):
+    """Extract structured XBRL data from downloaded filings into CSV files."""
     try:
-        parser.parse_all_filings_structured(company_filings_path, output_path_obj)
-        # Success message is handled by parse_all_filings_structured
-    except FileNotFoundError as e:  # Should be caught by the check above, but good practice
-        raise click.FileError(str(e))
+        extractor = FilingsExtractor()
+        click.echo(f"Finding downloaded filings for {ticker}...")
+        filing_list = extractor.get_company_filings(ticker)
+        
+        if not filing_list:
+            click.echo(f"No filings found for {ticker}. Run the 'fetch' command first.", err=True)
+            return
+            
+        click.echo(f"Found {len(filing_list)} filings. Extracting data...")
+        extracted_data = extractor.extract_data(ticker, filing_list)
+        extractor.save_to_csv(ticker, extracted_data)
+        
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}. Ensure filings for '{ticker}' have been downloaded.", err=True)
     except Exception as e:
-        click.echo(f"❌ An unexpected error occurred during parsing for '{ticker}': {e}", err=True)
-        # import traceback
-        # click.echo(traceback.format_exc(), err=True)
-
+        click.echo(f"An unexpected error occurred: {e}", err=True)
 
 @cli.command()
-@click.argument("ticker")
-@click.option("--output", default=None, help="Custom base output directory for extracted CSVs")
-def extract(ticker: str, output: Optional[str]):
-    """Extract financial data to CSV for a ticker"""
-    extractor = FilingsExtractor()
-
-    # FilingsExtractor.get_company_filings expects the raw ticker and sanitizes it internally
-    # to find the directory like ./filings/SAFE_TICKER/
+@click.option("--ticker", required=True, help="Ticker symbol to process.")
+def parse(ticker):
+    """Parse textual 'Item 8' data from downloaded filings into a single JSON file."""
     try:
-        filings_to_extract = extractor.get_company_filings(ticker)
-    except FileNotFoundError:
-        safe_ticker_for_path = sanitize_filename(ticker)
-        expected_path = Path(DEFAULT_FILINGS_DIRECTORY) / safe_ticker_for_path
-        raise click.FileError(
-            f"No filings directory found for ticker '{ticker}' at '{expected_path}'. Please run the 'fetch' command first.")
+        parser = FilingParser()
+        filings_path = Path(DEFAULT_FILINGS_DIRECTORY) / ticker
+        output_file = Path(DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY) / f"parsed_{ticker}.json"
+        
+        click.echo(f"Parsing text from filings in: {filings_path}")
+        parser.parse_all_filings_structured(filings_path, output_file)
+        
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}. Ensure filings for '{ticker}' have been downloaded.", err=True)
+    except Exception as e:
+        click.echo(f"An unexpected error occurred: {e}", err=True)
 
-    if not filings_to_extract:
-        click.echo(
-            f"⚠️ No filing subdirectories found to extract for ticker '{ticker}'. The directory '{Path(DEFAULT_FILINGS_DIRECTORY) / sanitize_filename(ticker)}' might be empty or contain no processable items.")
+@cli.command()
+@click.option("--csv", "csv_path", required=True, help="Path to the extracted CSV file to ingest.")
+@click.option("--ticker", required=True)
+@click.option("--cik", required=True)
+@click.option("--year", type=int, required=True)
+@click.option("--filing-type", default="10-K-XBRL", show_default=True)
+@click.option("--source", default="", help="Source document name. Defaults to CSV filename.")
+@click.option("--mode", type=click.Choice(["nl", "raw", "merge"]), default="nl", show_default=True)
+@click.option("--model", default=os.getenv("MODEL_NAME", "BAAI/bge-small-en"), show_default=True)
+def ingest(csv_path, ticker, cik, year, filing_type, source, mode, model):
+    """Ingest a CSV file into the vector database."""
+    if mode == "nl":
+        chunks = process_csv_to_natural_language(csv_path)
+    elif mode == "raw":
+        chunks = process_csv_to_raw_string(csv_path)
+    else:
+        chunks = process_csv_original_method(csv_path)
+    
+    if not chunks:
+        raise click.ClickException("No chunks produced from CSV.")
+
+    mdl, tok = load_model_and_tokenizer(model)
+    
+    from sec_analyzer.vector_db.embedding import calculate_embeddings_from_chunks
+    embs = calculate_embeddings_from_chunks(mdl, tok, chunks)
+    
+    filing = Filing(cik=cik, ticker=ticker, filing_type=filing_type, year=year, source=source or os.path.basename(csv_path))
+    result = insert_filing_with_embeddings(filing, chunks, embs)
+    
+    upserts = result.upserted_count if result else 0
+    matched = result.matched_count if result else 0
+    click.echo(f"✅ Ingest complete. Upserts: {upserts} | Matched: {matched}")
+
+@cli.command()
+@click.option("--q", "query_text", required=True, help="The question you want to ask.")
+@click.option("--k", type=int, default=5, show_default=True, help="Number of results to return.")
+@click.option("--ticker", help="Filter results by a specific ticker.")
+@click.option("--year-gte", type=int, help="Filter results to years greater than or equal to this value.")
+@click.option("--model", default=os.getenv("MODEL_NAME", "BAAI/bge-small-en"), show_default=True)
+def query(query_text, k, ticker, year_gte, model):
+    """Perform a semantic search on the vector database."""
+    client = MongoClient(os.getenv("MONGODB_URI"))
+    col = client[os.getenv("DB_NAME")][os.getenv("COLLECTION_NAME", "embedded_chunks")]
+    index_name = os.getenv("SEARCH_INDEX_NAME", "vector_index")
+    mdl, tok = load_model_and_tokenizer(model)
+
+    filters = {}
+    if ticker:
+        filters["ticker"] = {"$eq": ticker}
+    if year_gte is not None:
+        filters["year"] = {"$gte": year_gte}
+    
+    # Pass None if filters is empty, not the empty dict itself.
+    final_filters = filters if filters else None
+
+    results = vector_search_with_filter(
+        collection=col, 
+        index_name=index_name, 
+        query_text=query_text, 
+        model=mdl, 
+        tokenizer=tok, 
+        limit=k, 
+        filters=final_filters
+    )
+    
+    if not results:
+        click.echo("No relevant results found.")
         return
 
-    output_base_dir: Path
-    if output:
-        output_base_dir = Path(output)
-    else:
-        output_base_dir = Path(DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY)
-
-    output_base_dir.mkdir(parents=True, exist_ok=True)  # Ensure the base output directory exists
-
-    click.echo(f"📊 Extracting data from {len(filings_to_extract)} filing(s) for '{ticker}' into '{output_base_dir}'...")
-
-    try:
-        # Extractor methods expect the raw ticker for internal sanitization and processing
-        data_frames_dict = extractor.extract_data(ticker, filings_to_extract)
-        extractor.save_to_csv(ticker, data_frames_dict, output_base_dir)
-        # Success message handled by save_to_csv
-    except Exception as e:
-        click.echo(f"❌ An unexpected error occurred during data extraction for '{ticker}': {e}", err=True)
-        # import traceback
-        # click.echo(traceback.format_exc(), err=True)
-
+    click.echo(f"Found {len(results)} result(s):")
+    for i, doc in enumerate(results, 1):
+        click.echo(f"\n[{i}] score={doc['score']:.4f} | {doc.get('ticker','?')} ({doc.get('year','?')})")
+        click.echo(doc.get("text_chunk", "<no text>"))
+        click.echo("-" * 60)
 
 if __name__ == "__main__":
     cli()
