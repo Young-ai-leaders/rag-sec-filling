@@ -1,11 +1,10 @@
-# core/parser.py
+# src/module1_scraper/parser.py
 import os
 import re
 import json
 from bs4 import BeautifulSoup
-from typing import List, Tuple, Dict, Any # Tuple, Dict, Any are not used, can be removed if not planned
-from pathlib import Path
-from config.settings import DEFAULT_FILINGS_DIRECTORY, DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY
+from typing import List, Tuple, Dict, Any 
+from sec_analyzer.config import DEFAULT_FILINGS_DIRECTORY, DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY
 
 class FilingParser:
     def __init__(self, filings_directory: str = DEFAULT_FILINGS_DIRECTORY):
