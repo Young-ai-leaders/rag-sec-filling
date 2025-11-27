@@ -80,10 +80,28 @@ def parse(ticker):
         parser = FilingParser()
         filings_path = Path(DEFAULT_FILINGS_DIRECTORY) / ticker
         output_file = Path(DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY) / f"parsed_{ticker}.json"
-        
+
         click.echo(f"Parsing text from filings in: {filings_path}")
         parser.parse_all_filings_structured(filings_path, output_file)
-        
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}. Ensure filings for '{ticker}' have been downloaded.", err=True)
+    except Exception as e:
+        click.echo(f"An unexpected error occurred: {e}", err=True)
+
+
+@cli.command()
+@click.option("--ticker", required=True, help="Ticker symbol to process.")
+def parse_risk_factors(ticker):
+    """Parse 'Item 1A: Risk Factors' from downloaded filings into a JSON file."""
+    try:
+        parser = FilingParser()
+        filings_path = Path(DEFAULT_FILINGS_DIRECTORY) / ticker
+        output_file = Path(DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY) / f"risk_factors_{ticker}.json"
+
+        click.echo(f"Parsing risk factors from filings in: {filings_path}")
+        parser.parse_risk_factors_all_filings(filings_path, output_file)
+
     except FileNotFoundError as e:
         click.echo(f"Error: {e}. Ensure filings for '{ticker}' have been downloaded.", err=True)
     except Exception as e:

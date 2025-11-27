@@ -2,18 +2,24 @@
 import os
 import re
 import json
+from pathlib import Path
 from bs4 import BeautifulSoup
-from typing import List, Tuple, Dict, Any 
+from typing import List, Tuple, Dict, Any
 from sec_analyzer.config import DEFAULT_FILINGS_DIRECTORY, DEFAULT_EXTRACTOR_OUTPUT_DIRECTORY
 
 class FilingParser:
     def __init__(self, filings_directory: str = DEFAULT_FILINGS_DIRECTORY):
         self.filings_directory = Path(filings_directory)
-        self.supported_file_types = ('.htm', '.html', '.txt') 
-        self.section_patterns = [ 
+        self.supported_file_types = ('.htm', '.html', '.txt')
+        self.section_patterns = [
             r"ITEM\s+8[\s\-–]+Financial Statements",
             r"ITEM\s+8[\s\-–]+FINANCIAL STATEMENTS",
             r"Financial Statements and Supplementary Data"
+        ]
+        self.risk_factor_patterns = [
+            r"ITEM\s+1A[\s\-–]+Risk Factors",
+            r"ITEM\s+1A[\s\-–]+RISK FACTORS",
+            r"Risk Factors"
         ]
 
     def parse_section(self, file_path: str | Path) -> str | None:
@@ -53,6 +59,44 @@ class FilingParser:
             return None
         except Exception as e:
             print(f"Unexpected error parsing {file_path}: {e}")
+            return None
+
+    def parse_risk_factors(self, file_path: str | Path) -> str | None:
+        """Extract Item 1A: Risk Factors section from filing."""
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                soup = BeautifulSoup(content, "html.parser")
+
+            text = soup.get_text(separator="\n", strip=True)
+            lines = text.splitlines()
+
+            start_idx = None
+            end_idx = None
+
+            # Regex patterns for finding risk factors section
+            item_1a_pattern = re.compile(r"ITEM\s+1A[\s\-–.:]*RISK FACTORS", re.IGNORECASE)
+            item_1b_pattern = re.compile(r"ITEM\s+1B[\sA-Z\.–.:]*", re.IGNORECASE)
+            item_2_pattern = re.compile(r"ITEM\s+2[\sA-Z\.–.:]*", re.IGNORECASE)
+
+            for i, line in enumerate(lines):
+                if start_idx is None and item_1a_pattern.match(line.strip()):
+                    start_idx = i
+                elif start_idx is not None and (item_1b_pattern.match(line.strip()) or item_2_pattern.match(line.strip())):
+                    end_idx = i
+                    break
+
+            if start_idx is not None:
+                section_lines = lines[start_idx:end_idx] if end_idx is not None else lines[start_idx:]
+                return "\n".join(section_lines).strip()
+
+            return None
+
+        except FileNotFoundError:
+            print(f"File not found: {file_path}")
+            return None
+        except Exception as e:
+            print(f"Unexpected error parsing risk factors from {file_path}: {e}")
             return None
 
     @staticmethod
@@ -124,3 +168,48 @@ class FilingParser:
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(parsed_data, f, indent=2)
         print(f"✅ Saved {len(parsed_data)} parsed documents to {output_file}")
+
+    def parse_risk_factors_all_filings(self, ticker_filings_path: Path, output_file: str | Path) -> None:
+        """Parse risk factors from all filings for a ticker and save to JSON."""
+        if not ticker_filings_path.exists():
+            raise FileNotFoundError(f"Directory {ticker_filings_path} not found")
+
+        # Count matching files
+        total_files = sum(
+            1 for file_path in ticker_filings_path.rglob('*')
+            if file_path.is_file() and
+            file_path.suffix.lower() in self.supported_file_types
+        )
+        if total_files == 0:
+            print(f"No supported files found in {ticker_filings_path} to parse.")
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump([], f, indent=2)
+            print(f"✅ Saved empty result to {output_file}")
+            return
+
+        print(f"⏳ Parsing risk factors from {total_files} filings from {ticker_filings_path}...")
+
+        parsed_risk_factors = []
+        processed_files = 0
+
+        for file_path in ticker_filings_path.rglob('*'):
+            if file_path.is_file() and file_path.suffix.lower() in self.supported_file_types:
+                processed_files += 1
+                print(f"📄 [{processed_files}/{total_files}] Processing: {file_path.name}")
+
+                risk_factors_text = self.parse_risk_factors(file_path)
+                if risk_factors_text:
+                    parsed_risk_factors.append({
+                        "file": str(file_path),
+                        "risk_factors": risk_factors_text
+                    })
+                    print(f"    ✅ Found risk factors")
+                else:
+                    print(f"    ❌ No risk factors found")
+
+        # Save results
+        output_file = Path(output_file)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(parsed_risk_factors, f, indent=2)
+        print(f"✅ Saved {len(parsed_risk_factors)} risk factor documents to {output_file}")
