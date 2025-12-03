@@ -12,8 +12,7 @@ The foundational data pipeline is complete. The system can now fetch SEC filings
 
 *   **Module 1: Web Scraper & Data Extractor (✅ Completed)**
 *   **Module 2: Vector Database Integration (✅ Completed)**
-*   **Module 3: RAG Pipeline Implementation (⏳ Upcoming)**
-*   **Module 4: Evaluation Framework (⏳ Upcoming)**
+*   **Module 3: RAG Pipeline Implementation (✅ Completed)**
 
 ## Features
 

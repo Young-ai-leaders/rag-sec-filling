@@ -16,6 +16,8 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 
+from module3.cli import run_interactive_cli
+
 sys.path.append(os.path.abspath("src"))
 
 from pymongo import MongoClient
@@ -24,6 +26,13 @@ from src.sec_analyzer.vector_db.model_loader import load_model_and_tokenizer
 
 load_dotenv()
 
+
+class SimpleTextLLM:
+    """Simple text-based LLM fallback that returns retrieved context."""
+
+    def invoke(self, input_text):
+        """Return a simple text response based on the input."""
+        return f"[Simple Text Response] Retrieved context for: {input_text}"
 
 @dataclass
 class RAGConfig:
@@ -373,42 +382,28 @@ Context from SEC filings:
             self.client.close()
             print("MongoDB connection closed.")
 
-
 def main():
-    """Main function for testing the RAG service."""
+    """Main entry point."""
+    print("--- SEC Filing Analysis System ---")
+    print("Initializing RAG Service components... (this may take a moment)")
+
     rag_service = SECRAGService(retrieval_k=5)
-    rag_service.setup()
 
-    questions = [
-        "What are Apple's main risk factors mentioned in Item 1A?",
-        "How much did Apple spend on research and development?",
-        "What are the key business segments of Apple?",
-        "What are Apple's revenue sources?",
-        "What is Apple's net income?",
-    ]
+    try:
+        rag_service.setup()
+    except Exception as e:
+        print(f"\n[FATAL ERROR] Could not initialize service: {e}")
+        return
 
-    for question in questions:
-        answer = rag_service.ask(question, ticker="AAPL")
-        print(f"Answer: {answer}\n")
-
-        docs = rag_service.get_context(question, ticker="AAPL")
-        print(f"Retrieved {len(docs)} documents")
-        for i, doc in enumerate(docs, 1):
-            print(f"  [{i}] Score: {doc.metadata.get('score', 'N/A'):.4f} | "
-                  f"Source: {doc.metadata.get('source', 'N/A')}")
-        print()
-
-    rag_service.close()
+    # Start the CLI loop
+    try:
+        run_interactive_cli(rag_service)
+    finally:
+        rag_service.close()
+        print("Goodbye!")
 
 
 
-
-class SimpleTextLLM:
-    """Simple text-based LLM fallback that returns retrieved context."""
-
-    def invoke(self, input_text):
-        """Return a simple text response based on the input."""
-        return f"[Simple Text Response] Retrieved context for: {input_text}"
 
 
 if __name__ == "__main__":
